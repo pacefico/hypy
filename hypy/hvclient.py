@@ -105,6 +105,7 @@ def update_all_cache(force=False):
 
     return True
 
+
 def fetch_data():
     """
         Fetch vm data from hyper-v server
@@ -333,6 +334,8 @@ def restore_vm_snap(vm_index, snap_name, force=False, vm_name="", no_cache=False
         snap_name (str): The name of the checkpoint to be restored
         vm_name (str): vm name that will be changed
         no_cache (bool): to not use cache file based
+        asjob(bool):  execute start job as a job in the session
+        waitjob(bool): wait the start job to finish when used with
 
     Returns:
         bool: True if success
@@ -343,11 +346,7 @@ def restore_vm_snap(vm_index, snap_name, force=False, vm_name="", no_cache=False
         vm_name = vms[vm_index]['Name']
 
     if force:
-        vm = get_vm(-1, vm_name)
-        state = states.get(vm['State'], "unknown")
-        print ("Vm in '{}' state".format(state))
-        if "off" in state or "saved" in state:
-            start_vm(-1, vm_name, asjob, waitjob)
+        force_start_vm(vm_name, asjob, waitjob)
 
     ps_script = 'Restore-VMSnapshot -Name "{0}" -VMName {1} -Confirm:$false'.format(snap_name, vm_name)
 
@@ -372,6 +371,8 @@ def remove_vm_snapshot(vm_index, snap_name, recursive=False, vm_name="", asjob=F
         recursive (bool, optional): Specifies that the checkpoint’s children are to be
             deleted along with the checkpoint
         vm_name (str): vm name that will be changed
+        asjob(bool):  execute start job as a job in the session
+        waitjob(bool): wait the start job to finish when used with
 
     Returns:
         bool: True if success
@@ -407,6 +408,8 @@ def create_vm_snapshot(vm_index, snap_name, vm_name="", asjob=False, waitjob=Fal
         vm_index (int): The machine's index generated in the current cache
         snap_name (str): The name of the checkpoint to be created
         vm_name (str): vm name that will be changed
+        asjob(bool):  execute start job as a job in the session
+        waitjob(bool): wait the start job to finish when used with
 
     Returns:
         bool: True if success
@@ -461,6 +464,8 @@ def stop_vm(vm_index, force=False, vm_name="", asjob=False, waitjob=False):
         vm_index (int): The machine's index generated in the current cache
         force (bool): Whether should force shutdown or not
         vm_name (str): vm name that will be changed
+        asjob(bool):  execute start job as a job in the session
+        waitjob(bool): wait the start job to finish when used with
     """
 
     if vm_name == "" and vm_index != -1:
@@ -490,6 +495,8 @@ def resume_vm(vm_index, vm_name="", asjob=False, waitjob=False):
     Args:
         vm_index (int): The machine's index generated in the current cache
         vm_name (str): vm name that will be changed
+        asjob(bool):  execute start job as a job in the session
+        waitjob(bool): wait the start job to finish when used with
     """
 
     if vm_name == "" and vm_index != -1:
@@ -545,6 +552,8 @@ def start_vm(vm_index, vm_name="", asjob=False, waitjob=False):
     Args:
         vm_index (int): The machine's index generated in the current cache
         vm_name (str): vm name that will be changed
+        asjob(bool):  execute start job as a job in the session
+        waitjob(bool): wait the start job to finish when used with
     """
 
     if vm_name == "" and vm_index != -1:
@@ -565,6 +574,39 @@ def start_vm(vm_index, vm_name="", asjob=False, waitjob=False):
     return True
 
 
+def force_start_vm(vm_name, asjob=False, waitjob=False, seconds=10, retries=3):
+    """
+    Forces start vm it it is in 'saved' or 'off' state
+    Args:
+        vm_name(str): name of the vm that will be forced to start
+        asjob(bool):  execute start job as a job in the session
+        waitjob(bool): wait the start job to finish when used with
+        seconds(float): seconds to wait after force start required
+
+    Returns:
+
+    """
+    count = 0
+    while count <= retries:
+        count += 1
+        try:
+            vm = get_vm(-1, vm_name)
+            if vm is not None:
+                state = states.get(vm['State'], "unknown")
+                print("Vm in '{}' state".format(state))
+
+                if "off" in state or "saved" in state:
+                    start_vm(-1, vm_name, asjob, waitjob)
+                    print("Waiting {}s before continue...".format(seconds))
+
+                time.sleep(seconds)
+                if "running" in state:
+                    break
+        except:
+            # erro esperado, realiza outras tentativas apos tempo definido
+            time.sleep(seconds)
+
+
 def save_vm(vm_index, vm_name="", asjob=False, waitjob=False):
     """
     Save virtual machine state
@@ -572,6 +614,8 @@ def save_vm(vm_index, vm_name="", asjob=False, waitjob=False):
     Args:
         vm_index (int): The machine's index generated in the current cache
         vm_name (str): vm name that will be changed
+        asjob(bool):  execute start job as a job in the session
+        waitjob(bool): wait the start job to finish when used with
     """
 
     if vm_name == "" and vm_index != -1:
@@ -635,6 +679,8 @@ def run_ps(ps, proto, asjob=False, waitjob=False):
     Args:
         ps (str): Powershell script to run
         proto (Protocol): Protocol containing target machine
+        asjob(bool):  execute start job as a job in the session
+        waitjob(bool): wait the start job to finish when used with
 
     Returns:
         Response: Object containing stderr, stdout and exit_status
